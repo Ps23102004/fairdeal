@@ -16,6 +16,9 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from fairdeal.cascade import CascadeParseError
+from fairdeal.collegeroi import run as collegeroi_run
+from fairdeal.contract import run as contract_run
+from fairdeal.lease import run as lease_run
 from fairdeal.rentcheck import run as rentcheck_run
 
 DEFAULT_PORT = 8000
@@ -34,11 +37,32 @@ _STATIC_ROUTES = {
 # tying up a ThreadingHTTPServer thread, not a remote attacker.
 _MAX_BODY_BYTES = 1_000_000
 
-# Modules 2-4 aren't built yet — the dispatch table only has rentcheck, and
-# the frontend shows their tabs as disabled. Adding a module later is one
-# import + one entry here.
+# Each module's run() takes different arguments (rentcheck: a chat message;
+# lease/contract: pasted document text; collegeroi: school + optional major),
+# so each dict value is a small (body: dict) -> dict adapter, not run() itself
+# — that keeps _route_post's dispatch uniform regardless of a module's own signature.
+def _dispatch_rentcheck(body: dict) -> dict:
+    return rentcheck_run(str(body.get("message", "")))
+
+
+def _dispatch_leasereview(body: dict) -> dict:
+    return lease_run(str(body.get("document_text", "")))
+
+
+def _dispatch_contractreview(body: dict) -> dict:
+    return contract_run(str(body.get("document_text", "")))
+
+
+def _dispatch_collegeroi(body: dict) -> dict:
+    major = body.get("major")
+    return collegeroi_run(str(body.get("school", "")), major if isinstance(major, str) and major.strip() else None)
+
+
 MODULES = {
-    "rentcheck": rentcheck_run,
+    "rentcheck": _dispatch_rentcheck,
+    "leasereview": _dispatch_leasereview,
+    "contractreview": _dispatch_contractreview,
+    "collegeroi": _dispatch_collegeroi,
 }
 
 
@@ -153,8 +177,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": f"unknown module {module_name!r}"})
                 return
             body = self._read_json_body()
-            message = str(body.get("message", ""))
-            result = module_fn(message)
+            result = module_fn(body)
             self._send_json(HTTPStatus.OK, result)
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})

@@ -6,10 +6,12 @@ One core engine (`fairdeal/engine.py`): extract a claim → compare it to a benc
 
 | Module | Input | Benchmark data | Status |
 |---|---|---|---|
-| Rent check | chat criteria (location/university/budget) or a listed rent | HUD Fair Market Rent + BLS regional CPI | day-1 vertical slice |
-| Lease review | scanned lease PDF | red-flag clause + escalation-term library | not started |
-| College ROI | major + school choice | IPEDS cost/outcomes data | not started |
-| Contract review | freelance/consulting contract PDF | red-flag clause library | not started |
+| Rent check | chat criteria (location/university/budget) or a listed rent | HUD Fair Market Rent + BLS regional CPI | built |
+| Lease review | pasted lease text | 7-entry red-flag clause + escalation-term library (`fairdeal/clauses.py`) | built |
+| College ROI | school name + optional major | College Scorecard (IPEDS-derived) cost/earnings data | built |
+| Contract review | pasted contract text | 7-entry red-flag clause library (`fairdeal/clauses.py`) | built |
+
+Lease/contract review are deliberately independent of the local-LLM cascade — deterministic keyword matching against the clause library, so they keep working even when Ollama is down (unlike rent-check's chat parsing). PDF upload isn't wired into the UI yet; `fairdeal/ocr.py` (pypdf + tesseract fallback) exists and is tested, ready for that when needed.
 
 Local-first: extraction runs through [llm-ladder](../llm-ladder)'s confidence-gated cascade (local models first, escalate only on low confidence). Nothing leaves the machine unless a paid API tier is configured in `chains.yaml`.
 
@@ -21,14 +23,15 @@ Recorded here as each external data source is confirmed live — see `tests/fixt
 - **HUD Fair Market Rent API** — live, requires a free bearer token. Unauthenticated request confirmed `401 {"error":"Unauthenticated"}` (fixture: `tests/fixtures/hud_fmr_unauth_response.json`). **Action needed from Parth**: register at https://www.huduser.gov/hudapi/public/register.html and set `HUD_API_TOKEN`. Until then, `fairdeal/hud.py` falls back to a small static FMR reference table.
 - **BLS CPI v2** — live, works with no key at low volume. Confirmed 2026-08-16 (fixture: `tests/fixtures/bls_cpi_sf.json`).
 - **Nominatim geocoding/reverse-geocoding** — live, no key, rate-limited to 1 req/sec (throttled in `fairdeal/geocode.py`). Confirmed for both search and reverse (fixtures: `tests/fixtures/nominatim_search_usf.json`, `tests/fixtures/nominatim_reverse_sf.json`).
-- **IPEDS bulk data** (module 3, deferred) — not yet checked; do this before starting module 3.
+- **College Scorecard API** (college ROI) — live, works with the public `DEMO_KEY`, no registration required (a free personal key raises the rate limit — set `SCORECARD_API_KEY`). Confirmed 2026-08-16 (fixture: `tests/fixtures/scorecard_usf.json`). **Real gotcha found while integrating**: the API's `fields=` narrow-selection parameter silently returns `null` for every nested `*.consumer.*` field (net price, earnings) even though those same fields resolve correctly in the full unfiltered response — `fairdeal/scorecard.py` always fetches the full response and parses client-side because of this. Also: Scorecard's relevance ranking does NOT put an exact school-name match first (searching "University of San Francisco" ranks a different school, UC-San Francisco, above the exact match) — `find_school()` prefers an exact case-insensitive match over API result order.
 
 ## Environment variables
 
 - `HUD_API_TOKEN` — optional. Free token from huduser.gov. Falls back to a static FMR table when unset.
 - `FAIRDEAL_SEARCH_PROVIDER` — optional, defaults to `seed`. Set to a registered provider name once a real listings API is wired in.
+- `SCORECARD_API_KEY` — optional. Free key from api.data.gov/signup. Falls back to the shared `DEMO_KEY` (lower rate limit) when unset.
 
-## API contract (frozen for day-1 frontend work)
+## API contracts
 
 `POST /api/rentcheck` body `{"message": "<free text rental request>"}` → `200 OK`:
 
@@ -50,7 +53,35 @@ Recorded here as each external data source is confirmed live — see `tests/fixt
 }
 ```
 
-`rating` is one of `fair` / `borderline` / `unfair` / `unknown`. `delta` may be `null` (rating `unknown`). `data_source` names the active search provider and is present on every `200` response, including empty ones — the default `"seed-demo"` means the listings are the demo dataset, not live rentals; clients should surface it. Errors: `400` malformed request, `503` local model cascade unavailable (`{"error": "..."}"`), `500` unexpected.
+`POST /api/leasereview` / `POST /api/contractreview` body `{"document_text": "<pasted lease/contract text>"}` → `200 OK`:
+
+```json
+{
+  "reply_text": "Found 2 red flags out of 2 clauses discussed; 5 topics not addressed at all.",
+  "data_source": "clause-library-v1",
+  "results": [
+    {"title": "Security Deposit Clause", "rating": "unfair", "delta": null, "explanation": "..."}
+  ]
+}
+```
+
+Ranked worst-first (unfair → borderline → unknown → fair) — the scariest findings surface immediately, opposite of rent-check's best-first order. `unknown` means the topic was never mentioned in the document, not that it's fine — silence on a high-severity topic (e.g. liability) ranks above silence on a low-severity one.
+
+`POST /api/collegeroi` body `{"school": "<school name>", "major": "<optional>"}` → `200 OK`:
+
+```json
+{
+  "reply_text": "University of San Francisco: borderline ROI — 4-year cost is 1.4x typical 10-year earnings.",
+  "data_source": "college-scorecard",
+  "results": [
+    {"title": "University of San Francisco", "rating": "borderline", "delta": 1.41, "explanation": "...", "completion_rate_4yr": 0.7006}
+  ]
+}
+```
+
+ROI is calculated at the school level (4-year net cost vs 10-year median earnings, fair ≤1.0x, borderline ≤2.5x — a disclosed heuristic, not an official benchmark, same honesty standard as rent-check's HUD FMR caveat); `major` is disclosed in the explanation but doesn't change the math, since Scorecard's per-major earnings data is too sparse to be reliable.
+
+All four: `rating` is one of `fair` / `borderline` / `unfair` / `unknown`. `delta` may be `null`. `data_source` is present on every `200`, including empty ones. Errors: `400` malformed request, `503` local model cascade unavailable (rent-check only — the other three modules don't depend on Ollama), `500` unexpected.
 
 ## Run
 

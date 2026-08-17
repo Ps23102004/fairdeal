@@ -16,13 +16,13 @@
       </header>
 
       <nav class="module-tabs" aria-label="FairDeal modules">
-        <a class="module-tab is-active" href="#rent-check" aria-current="page">Rent Check</a>
-        <span class="module-tab is-disabled" aria-disabled="true">Lease Review <small>Coming soon</small></span>
-        <span class="module-tab is-disabled" aria-disabled="true">College ROI <small>Coming soon</small></span>
-        <span class="module-tab is-disabled" aria-disabled="true">Contract Review <small>Coming soon</small></span>
+        <a class="module-tab is-active" href="#rent-check" data-target="rent-check" aria-current="page">Rent Check</a>
+        <a class="module-tab" href="#lease-review" data-target="lease-review">Lease Review</a>
+        <a class="module-tab" href="#college-roi" data-target="college-roi">College ROI</a>
+        <a class="module-tab" href="#contract-review" data-target="contract-review">Contract Review</a>
       </nav>
 
-      <section class="chat-pane" id="rent-check" aria-label="Rent check chat">
+      <section class="chat-pane module-panel is-active" id="rent-check" data-target="rent-check" aria-label="Rent check chat">
         <div class="chat-log" id="chat-log" aria-live="polite" aria-label="Conversation">
           <article class="message message--app">
             <div class="message__bubble">
@@ -35,6 +35,54 @@
           <label class="sr-only" for="chat-input">Describe a rental listing</label>
           <input id="chat-input" name="message" type="text" placeholder="e.g. $2,400 for a 1BR near downtown" autocomplete="off" required>
           <button id="send-btn" type="submit">Ask FairDeal <span aria-hidden="true">→</span></button>
+        </form>
+      </section>
+
+      <section class="module-panel document-review-pane" id="lease-review" data-target="lease-review" aria-label="Lease review">
+        <div class="chat-log module-log" id="lease-review-log" aria-live="polite" aria-label="Lease review results">
+          <article class="message message--app">
+            <div class="message__bubble">Paste your lease below and FairDeal will flag clauses worth a closer look.</div>
+          </article>
+        </div>
+
+        <form class="document-review-form" id="lease-review-form">
+          <label for="lease-text">Paste your lease text</label>
+          <textarea id="lease-text" name="lease_text" rows="10" placeholder="Paste the full lease, or the clauses you want to understand—fees, deposits, repairs, renewal terms, and more." required></textarea>
+          <button type="submit">Check This Lease <span aria-hidden="true">→</span></button>
+        </form>
+      </section>
+
+      <section class="module-panel college-roi-pane" id="college-roi" data-target="college-roi" aria-label="College ROI">
+        <div class="chat-log module-log" id="college-roi-log" aria-live="polite" aria-label="College ROI results">
+          <article class="message message--app">
+            <div class="message__bubble">Compare a school’s outcomes before you commit to the cost.</div>
+          </article>
+        </div>
+
+        <form class="college-roi-form" id="college-roi-form">
+          <div class="form-field">
+            <label for="school-name">School name</label>
+            <input id="school-name" name="school_name" type="text" placeholder="University of San Francisco" autocomplete="organization" required>
+          </div>
+          <div class="form-field">
+            <label for="intended-major">Intended major <span>(optional)</span></label>
+            <input id="intended-major" name="major" type="text" placeholder="e.g. Computer Science" autocomplete="off">
+          </div>
+          <button type="submit">Check ROI <span aria-hidden="true">→</span></button>
+        </form>
+      </section>
+
+      <section class="module-panel document-review-pane" id="contract-review" data-target="contract-review" aria-label="Contract review">
+        <div class="chat-log module-log" id="contract-review-log" aria-live="polite" aria-label="Contract review results">
+          <article class="message message--app">
+            <div class="message__bubble">Paste a contract to get a clear read on terms, obligations, and potential red flags.</div>
+          </article>
+        </div>
+
+        <form class="document-review-form" id="contract-review-form">
+          <label for="contract-text">Paste your contract text</label>
+          <textarea id="contract-text" name="contract_text" rows="10" placeholder="Paste the full contract, or the clauses you want to review—payment, cancellation, liability, and renewal terms." required></textarea>
+          <button type="submit">Check This Contract <span aria-hidden="true">→</span></button>
         </form>
       </section>
       <p class="benchmark-note">Verdicts compare against HUD’s Fair Market Rent, a 40th-percentile benchmark—not a market median.</p>

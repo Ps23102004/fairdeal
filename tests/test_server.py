@@ -65,9 +65,9 @@ def test_forbidden_origin_rejected(live_server) -> None:
 
 
 def test_unknown_module_404(live_server) -> None:
-    status, payload = _post(live_server, "/api/leasereview", b'{"message":"hi"}', {"Content-Type": "application/json"})
+    status, payload = _post(live_server, "/api/notarealmodule", b'{"message":"hi"}', {"Content-Type": "application/json"})
     assert status == 404
-    assert "leasereview" in payload["error"]
+    assert "notarealmodule" in payload["error"]
 
 
 def test_malformed_json_400(live_server) -> None:
@@ -107,6 +107,79 @@ def test_successful_rentcheck_roundtrip(live_server) -> None:
         )
     assert status == 200
     assert payload == fake_result
+
+
+def test_leasereview_dispatch_passes_document_text(live_server) -> None:
+    captured = {}
+
+    def fake_run(document_text):
+        captured["document_text"] = document_text
+        return {"reply_text": "ok", "data_source": "clause-library-v1", "results": []}
+
+    with patch("fairdeal.server.lease_run", fake_run):
+        status, payload = _post(
+            live_server,
+            "/api/leasereview",
+            json.dumps({"document_text": "the rent may increase at landlord's sole discretion"}).encode(),
+            {"Content-Type": "application/json"},
+        )
+    assert status == 200
+    assert payload["data_source"] == "clause-library-v1"
+    assert captured["document_text"] == "the rent may increase at landlord's sole discretion"
+
+
+def test_contractreview_dispatch_passes_document_text(live_server) -> None:
+    captured = {}
+
+    def fake_run(document_text):
+        captured["document_text"] = document_text
+        return {"reply_text": "ok", "data_source": "clause-library-v1", "results": []}
+
+    with patch("fairdeal.server.contract_run", fake_run):
+        status, payload = _post(
+            live_server,
+            "/api/contractreview",
+            json.dumps({"document_text": "unlimited liability"}).encode(),
+            {"Content-Type": "application/json"},
+        )
+    assert status == 200
+    assert captured["document_text"] == "unlimited liability"
+
+
+def test_collegeroi_dispatch_passes_school_and_major(live_server) -> None:
+    captured = {}
+
+    def fake_run(school, major=None):
+        captured["school"] = school
+        captured["major"] = major
+        return {"reply_text": "ok", "data_source": "college-scorecard", "results": []}
+
+    with patch("fairdeal.server.collegeroi_run", fake_run):
+        status, payload = _post(
+            live_server,
+            "/api/collegeroi",
+            json.dumps({"school": "University of San Francisco", "major": "Computer Science"}).encode(),
+            {"Content-Type": "application/json"},
+        )
+    assert status == 200
+    assert captured == {"school": "University of San Francisco", "major": "Computer Science"}
+
+
+def test_collegeroi_dispatch_blank_major_becomes_none(live_server) -> None:
+    captured = {}
+
+    def fake_run(school, major=None):
+        captured["major"] = major
+        return {"reply_text": "ok", "data_source": "college-scorecard", "results": []}
+
+    with patch("fairdeal.server.collegeroi_run", fake_run):
+        _post(
+            live_server,
+            "/api/collegeroi",
+            json.dumps({"school": "X", "major": "   "}).encode(),
+            {"Content-Type": "application/json"},
+        )
+    assert captured["major"] is None
 
 
 def test_unexpected_exception_returns_generic_500_no_leak(live_server) -> None:

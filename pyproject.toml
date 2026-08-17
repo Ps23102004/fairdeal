@@ -13,6 +13,9 @@ dependencies = [
     "requests",
     "pyyaml",
     "llm-ladder",
+    "pypdf",
+    "pdf2image",
+    "pytesseract",
 ]
 
 [project.scripts]
