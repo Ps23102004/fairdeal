@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="FairDeal helps renters understand whether a listing is fairly priced.">
+    <title>FairDeal — Is this rent fair?</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="site-header">
+        <p class="eyebrow">Rent clarity, without the guesswork</p>
+        <h1>FairDeal</h1>
+        <p class="tagline">Is this rent fair? Ask.</p>
+      </header>
+
+      <nav class="module-tabs" aria-label="FairDeal modules">
+        <a class="module-tab is-active" href="#rent-check" aria-current="page">Rent Check</a>
+        <span class="module-tab is-disabled" aria-disabled="true">Lease Review <small>Coming soon</small></span>
+        <span class="module-tab is-disabled" aria-disabled="true">College ROI <small>Coming soon</small></span>
+        <span class="module-tab is-disabled" aria-disabled="true">Contract Review <small>Coming soon</small></span>
+      </nav>
+
+      <section class="chat-pane" id="rent-check" aria-label="Rent check chat">
+        <div class="chat-log" id="chat-log" aria-live="polite" aria-label="Conversation">
+          <article class="message message--app">
+            <div class="message__bubble">
+              Tell me what you’re looking at—neighborhood, bedrooms, and rent—and I’ll help you put the price in context.
+            </div>
+          </article>
+        </div>
+
+        <form class="chat-form" id="chat-form">
+          <label class="sr-only" for="chat-input">Describe a rental listing</label>
+          <input id="chat-input" name="message" type="text" placeholder="e.g. $2,400 for a 1BR near downtown" autocomplete="off" required>
+          <button id="send-btn" type="submit">Ask FairDeal <span aria-hidden="true">→</span></button>
+        </form>
+      </section>
+      <p class="benchmark-note">Verdicts compare against HUD’s Fair Market Rent, a 40th-percentile benchmark—not a market median.</p>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

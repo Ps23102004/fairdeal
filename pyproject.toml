@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fairdeal"
+version = "0.1.0"
+description = "Extract a claim, compare it to real benchmark data, output a fair/unfair verdict — rent, leases, college ROI, contracts."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = [
+    "requests",
+    "pyyaml",
+    "llm-ladder",
+]
+
+[project.scripts]
+fairdeal = "fairdeal.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["fairdeal"]
+
+# server.py resolves WEB_DIR as the package's parent directory / "web" — in an
+# editable install that's the repo root (already correct), but a real wheel
+# install needs web/ force-included next to the installed package so that
+# resolution still lands somewhere real instead of a 404 at "/".
+[tool.hatch.build.targets.wheel.force-include]
+"web" = "web"
+"chains.yaml" = "chains.yaml"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "fairdeal/*",
+    "web/*",
+    "chains.yaml"
+]
+
+[tool.hatch.build]
+include = [
+    "fairdeal/*",
+    "web/*",
+    "chains.yaml"
+]
