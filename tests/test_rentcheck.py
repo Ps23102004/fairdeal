@@ -19,6 +19,13 @@ def _usf_point():
     return GeoPoint(lat=37.7794, lon=-122.4514, display_name="University of San Francisco")
 
 
+@pytest.fixture(autouse=True)
+def _no_live_web_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    # web_references hits real DuckDuckGo network calls otherwise — every
+    # test in this file would slow down and depend on network availability.
+    monkeypatch.setattr("fairdeal.rentcheck.search_web", lambda query, max_results=5: [])
+
+
 def _listing(price=2400, lat=37.7800, lon=-122.4520, title="Test listing", bedrooms=2, home_type="apartment"):
     return Listing(
         title=title,
@@ -137,6 +144,52 @@ def test_run_results_sorted_best_first() -> None:
 
 def test_default_radius_is_five_miles() -> None:
     assert DEFAULT_RADIUS_MILES == 5.0
+
+
+def test_run_includes_web_references_alongside_verdicts(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_refs = [{"title": "Apartments in SF - Zillow", "url": "https://www.zillow.com/san-francisco-ca/"}]
+    monkeypatch.setattr("fairdeal.rentcheck.search_web", lambda query, max_results=5: fake_refs)
+    with (
+        patch("fairdeal.rentcheck.parse_criteria", return_value=_criteria()),
+        patch("fairdeal.rentcheck.geocode", return_value=_usf_point()),
+        patch("fairdeal.rentcheck.get_provider") as mock_get_provider,
+        patch("fairdeal.rentcheck.hud.fmr_for", return_value=_fmr_benchmark()),
+    ):
+        mock_get_provider.return_value.search.return_value = [_listing()]
+        result = run("2BR near USF")
+
+    assert result["web_references"] == fake_refs
+
+
+def test_run_web_search_failure_degrades_to_empty_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fairdeal.websearch import WebSearchError
+
+    def _boom(query, max_results=5):
+        raise WebSearchError("network down")
+
+    monkeypatch.setattr("fairdeal.rentcheck.search_web", _boom)
+    with (
+        patch("fairdeal.rentcheck.parse_criteria", return_value=_criteria()),
+        patch("fairdeal.rentcheck.geocode", return_value=_usf_point()),
+        patch("fairdeal.rentcheck.get_provider") as mock_get_provider,
+        patch("fairdeal.rentcheck.hud.fmr_for", return_value=_fmr_benchmark()),
+    ):
+        mock_get_provider.return_value.search.return_value = [_listing()]
+        result = run("2BR near USF")  # must not raise
+
+    assert result["web_references"] == []
+
+
+def test_run_no_anchors_still_includes_web_references(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_refs = [{"title": "x", "url": "https://example.com"}]
+    monkeypatch.setattr("fairdeal.rentcheck.search_web", lambda query, max_results=5: fake_refs)
+    with (
+        patch("fairdeal.rentcheck.parse_criteria", return_value=_criteria()),
+        patch("fairdeal.rentcheck.geocode", side_effect=GeocodeError("no match")),
+    ):
+        result = run("somewhere unresolvable")
+
+    assert result["web_references"] == fake_refs
 
 
 def test_run_studio_bedrooms_zero_is_not_coerced_to_one() -> None:

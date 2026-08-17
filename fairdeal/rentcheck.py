@@ -15,7 +15,8 @@ from fairdeal import bls, hud
 from fairdeal.cascade import parse_criteria
 from fairdeal.engine import DEFAULT_RULES, Claim, evaluate
 from fairdeal.geocode import GeocodeError, GeoPoint, geocode, haversine
-from fairdeal.search import Listing, get_provider
+from fairdeal.search import Listing, SearchCriteria, get_provider
+from fairdeal.websearch import WebSearchError, search_web
 
 DEFAULT_RADIUS_MILES = 5.0
 _RATING_ORDER = {"fair": 0, "borderline": 1, "unfair": 2, "unknown": 3}
@@ -79,6 +80,22 @@ def _benchmarked_verdict(listing: Listing):
     return verdict.rating, verdict.delta, verdict.explanation
 
 
+def _web_references(criteria: SearchCriteria) -> list[dict]:
+    """Real (unverified) web search links for the user's criteria — a
+    best-effort supplement, never fed into the fairness-verdict engine
+    (see fairdeal/websearch.py for why: these are category-search pages,
+    not individually priced listings). Degrades to an empty list on any
+    search failure rather than affecting the rest of the response."""
+    if not criteria.anchors:
+        return []
+    home_type = criteria.home_type or "apartments"
+    query = f"{home_type} for rent near {', '.join(criteria.anchors)}"
+    try:
+        return search_web(query, max_results=5)
+    except WebSearchError:
+        return []
+
+
 def _rank_key(result: dict) -> tuple[int, float]:
     """Best-first: fair before borderline before unfair before unknown, then by
     fairness delta (price / benchmark) ascending — best value first, NOT cheapest
@@ -113,6 +130,7 @@ def run(message: str) -> dict:
             ),
             "results": [],
             "data_source": data_source,
+            "web_references": _web_references(criteria),
         }
 
     results = []
@@ -142,7 +160,12 @@ def run(message: str) -> dict:
         if results
         else f"Found nothing within {DEFAULT_RADIUS_MILES:g} miles of those places{budget_clause}."
     )
-    return {"reply_text": reply_text, "results": results, "data_source": data_source}
+    return {
+        "reply_text": reply_text,
+        "results": results,
+        "data_source": data_source,
+        "web_references": _web_references(criteria),
+    }
 
 
 if __name__ == "__main__":

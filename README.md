@@ -49,9 +49,14 @@ Recorded here as each external data source is confirmed live — see `tests/fixt
       "delta": 1.12,
       "explanation": "2,400 is 1.12x the FMR 1BR San Francisco (2,149, HUD FMR 2024 (static fallback, no HUD_API_TOKEN configured)) — borderline."
     }
+  ],
+  "web_references": [
+    {"title": "Apartments For Rent in San Francisco CA - Zillow", "url": "https://www.zillow.com/san-francisco-ca/apartments/"}
   ]
 }
 ```
+
+`web_references` is a best-effort supplement — real live DuckDuckGo search results (`fairdeal/websearch.py`) for the query, e.g. real Zillow/Apartments.com category-search pages for the area. These are NOT individually priced listings (that data is bot-blocked, see the endpoint verification log) and are never run through the fairness-verdict engine — they're unverified reference links, always shown separately from `results`. Degrades to `[]` on search failure or when no anchors were mentioned.
 
 `POST /api/leasereview` / `POST /api/contractreview` body `{"document_text": "<pasted lease/contract text>"}` → `200 OK`:
 

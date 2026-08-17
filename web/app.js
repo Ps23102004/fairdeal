@@ -59,6 +59,24 @@ function renderResults(results) {
   return results.map(renderVerdictCard).join("");
 }
 
+function renderWebReferences(webReferences) {
+  if (!Array.isArray(webReferences) || !webReferences.length) {
+    return "";
+  }
+  const items = webReferences
+    .map(
+      (ref) =>
+        `<li><a href="${escapeHtml(safeListingUrl(ref.url))}" target="_blank" rel="noreferrer">${escapeHtml(ref.title)}</a></li>`
+    )
+    .join("");
+  return `
+    <div class="web-references">
+      <p class="web-references__label">Explore more listings (unverified web search results):</p>
+      <ul class="web-references__list">${items}</ul>
+    </div>
+  `;
+}
+
 function appendMessage(role, html, logEl = document.querySelector("#chat-log")) {
   const message = document.createElement("article");
 
@@ -173,7 +191,7 @@ chatForm.addEventListener("submit", async (event) => {
       responseHtml = `<p class="request-error">Sorry—${escapeHtml(errorMessage)}</p>`;
     } else {
       const body = await response.json();
-      responseHtml = `${escapeHtml(body.reply_text)}${renderDataSourceNote(body.data_source)}${renderResults(body.results)}`;
+      responseHtml = `${escapeHtml(body.reply_text)}${renderDataSourceNote(body.data_source)}${renderResults(body.results)}${renderWebReferences(body.web_references)}`;
     }
   } catch (error) {
     console.error("FairDeal rent check failed.", error);
