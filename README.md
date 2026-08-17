@@ -102,7 +102,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-Pulls `llm-ladder` straight from GitHub (it's not on PyPI) — no separate clone needed.
+Pulls `llm-ladder` straight from GitHub, pinned to a specific commit (it's not on PyPI, and an unpinned git dependency would silently track whatever's on `main` at install time) — no separate clone needed.
 
 Scanned-PDF OCR (the `pdf_base64` path on lease/contract review) needs two system binaries beyond the Python deps: `tesseract` (`brew install tesseract`) and `poppler` (`brew install poppler`, for `pdf2image`). Pasted-text and text-layer PDFs work without either.
 
