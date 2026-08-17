@@ -43,7 +43,7 @@ button, input, textarea { font: inherit; }
   padding: 64px 0 28px;
 }
 
-.site-header { margin: 0 8px 34px; padding-left: 16px; border-left: 6px solid var(--accent); }
+.site-header { margin: 0 8px 34px; }
 
 .eyebrow {
   margin: 0 0 8px;
