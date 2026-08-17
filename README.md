@@ -15,7 +15,7 @@ One core engine (`fairdeal/engine.py`): extract a claim → compare it to a benc
 
 Lease/contract review are deliberately independent of the local-LLM cascade — deterministic keyword matching against the clause library, so they keep working even when Ollama is down (unlike rent-check's chat parsing). Both accept a pasted-text OR an uploaded PDF (`fairdeal/ocr.py`: pypdf text layer + tesseract fallback for scanned pages). Rent Check has a model selector in the UI — pick any Ollama-pulled model for that one request via `GET /api/models` / the `model` field on `POST /api/rentcheck`, bypassing `chains.yaml`'s configured cascade.
 
-Local-first: extraction runs through [llm-ladder](../llm-ladder)'s confidence-gated cascade (local models first, escalate only on low confidence). Nothing leaves the machine unless a paid API tier is configured in `chains.yaml`.
+Local-first: extraction runs through [llm-ladder](https://github.com/Ps23102004/llm-ladder)'s confidence-gated cascade (local models first, escalate only on low confidence). Nothing leaves the machine unless a paid API tier is configured in `chains.yaml`.
 
 ## Endpoint verification log (day 1)
 
@@ -26,7 +26,7 @@ Recorded here as each external data source is confirmed live — see `tests/fixt
 - **BLS CPI v2** — live, works with no key at low volume. Confirmed 2026-08-16 (fixture: `tests/fixtures/bls_cpi_sf.json`).
 - **Nominatim geocoding/reverse-geocoding** — live, no key, rate-limited to 1 req/sec (throttled in `fairdeal/geocode.py`). Confirmed for both search and reverse (fixtures: `tests/fixtures/nominatim_search_usf.json`, `tests/fixtures/nominatim_reverse_sf.json`).
 - **DuckDuckGo HTML search** (rent-check's `web_references`) — live, no key. Requires POST (a GET just returns the empty search shell) and a browser-like User-Agent. Ad results always redirect through `duckduckgo.com/y.js` — filtered out in `fairdeal/websearch.py`, only organic direct-domain links are kept.
-- **Ollama** — the local model runtime itself needs a real model pulled and reachable at `:11434`. `chains.yaml`'s tiers must be actual `ollama pull`-able tags; `qwen2.5:3b` (small, fast) is pulled by default. If `~/.ollama/models` symlinks to external/offline storage, either reconnect it or run `OLLAMA_MODELS=<a real local path> ollama serve` and re-pull.
+- **Ollama** — the local model runtime itself needs a real model pulled and reachable at `:11434`. `chains.yaml`'s tiers must be actual `ollama pull`-able tags; `gemma4:e4b-mlx` is the model configured by default (see `chains.yaml`). If `~/.ollama/models` symlinks to external/offline storage, either reconnect it or run `OLLAMA_MODELS=<a real local path> ollama serve` and re-pull.
 - **College Scorecard API** (college ROI) — live, works with the public `DEMO_KEY`, no registration required (a free personal key raises the rate limit — set `SCORECARD_API_KEY`). Confirmed 2026-08-16 (fixture: `tests/fixtures/scorecard_usf.json`). **Real gotcha found while integrating**: the API's `fields=` narrow-selection parameter silently returns `null` for every nested `*.consumer.*` field (net price, earnings) even though those same fields resolve correctly in the full unfiltered response — `fairdeal/scorecard.py` always fetches the full response and parses client-side because of this. Also: Scorecard's relevance ranking does NOT put an exact school-name match first (searching "University of San Francisco" ranks a different school, UC-San Francisco, above the exact match) — `find_school()` prefers an exact case-insensitive match over API result order.
 
 ## Environment variables
@@ -37,7 +37,7 @@ Recorded here as each external data source is confirmed live — see `tests/fixt
 
 ## API contracts
 
-`GET /api/models` → `{"models": ["qwen2.5:3b", ...]}` — Ollama-pulled model tags for the UI's model selector. Degrades to `{"models": []}` if Ollama isn't reachable.
+`GET /api/models` → `{"models": ["gemma4:e4b-mlx", ...]}` — Ollama-pulled model tags for the UI's model selector. Degrades to `{"models": []}` if Ollama isn't reachable.
 
 `POST /api/rentcheck` body `{"message": "<free text rental request>", "model": "<optional Ollama tag>"}` → `200 OK`. `model` overrides `chains.yaml`'s configured cascade with a single-tier, single-sample chain for that exact model — omit (or blank) to use the configured cascade as normal.
 
@@ -93,6 +93,18 @@ Ranked worst-first (unfair → borderline → unknown → fair) — the scariest
 ROI is calculated at the school level (4-year net cost vs 10-year median earnings, fair ≤1.0x, borderline ≤2.5x — a disclosed heuristic, not an official benchmark, same honesty standard as rent-check's HUD FMR caveat); `major` is disclosed in the explanation but doesn't change the math, since Scorecard's per-major earnings data is too sparse to be reliable.
 
 All four: `rating` is one of `fair` / `borderline` / `unfair` / `unknown`. `delta` may be `null`. `data_source` is present on every `200`, including empty ones. Errors: `400` malformed request, `503` local model cascade unavailable (rent-check only — the other three modules don't depend on Ollama), `500` unexpected.
+
+## Install
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+Pulls `llm-ladder` straight from GitHub (it's not on PyPI) — no separate clone needed.
+
+Scanned-PDF OCR (the `pdf_base64` path on lease/contract review) needs two system binaries beyond the Python deps: `tesseract` (`brew install tesseract`) and `poppler` (`brew install poppler`, for `pdf2image`). Pasted-text and text-layer PDFs work without either.
 
 ## Run
 
