@@ -27,9 +27,13 @@ Schema (exactly these four keys):
 
 anchors: place names mentioned — universities, neighborhoods, landmarks, cities.
   Expand well-known abbreviations to their full name.
-budget_monthly: a dollar figure EXPLICITLY stated as rent/budget/price, digits only (no $ or commas).
-  null if no dollar amount is stated. NEVER infer a budget from an unrelated number in the
-  message (a headcount like "5 guys", a bedroom count, a distance, a date — none of these are a budget).
+budget_monthly: a dollar figure EXPLICITLY marked with $, "budget", "rent", "price", or "under/around/near <amount>
+  a month/dollars". digits only (no $ or commas). null if no dollar amount is stated.
+  NEVER infer a budget from ANY other number in the message — a headcount ("5 guys"), a stay
+  duration ("5 days", "for a week", "2 nights"), a bedroom count, a distance, a date, an
+  apartment/unit number: none of these are a budget, no matter how the sentence is phrased.
+  If you are not looking directly at a dollar sign or the word "budget"/"rent"/"price" attached
+  to a number, output null.
 bedrooms: number of bedrooms, or null if unstated.
 home_type: e.g. "apartment", "house", "studio", or null if unstated.
 
@@ -41,6 +45,9 @@ Example output: {{"anchors": ["Oakland"], "budget_monthly": 3200, "bedrooms": nu
 
 Example input: house to rent for 5 guys in Miami near the beach
 Example output: {{"anchors": ["Miami", "beach"], "budget_monthly": null, "bedrooms": null, "home_type": "house"}}
+
+Example input: i want a condo to rent for 5 days in miami florida near beach
+Example output: {{"anchors": ["Miami", "beach"], "budget_monthly": null, "bedrooms": null, "home_type": "condo"}}
 
 Input: {message}
 Output:"""
