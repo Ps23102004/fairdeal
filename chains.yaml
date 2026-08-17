@@ -1,12 +1,15 @@
 # Tiers must be real Ollama-pulled model tags (llm-ladder talks to Ollama's
-# native /api/chat, not LM Studio's OpenAI-compatible endpoint) — the
-# "-mlx"-suffixed names are LM Studio/MLX models served on a different port
-# (1234) and were never reachable here; confirmed live 2026-08-16 when chat
-# parsing 503'd. gemma4:e4b is the Ollama-native (non-MLX) build of Parth's
-# preferred local model, pulled locally 2026-08-16. Add a second/third tier
-# by `ollama pull`-ing more models and listing them here, largest last.
+# native /api/chat). Correction to an earlier assumption here: "-mlx" tags
+# are NOT automatically LM Studio-only — Ollama's own registry hosts MLX
+# builds too (confirmed live 2026-08-16: `ollama pull gemma4:e4b-mlx` +
+# a real /api/chat call both succeeded on this machine). The original
+# day-1 chain (gemma4:e4b-mlx / qwen3.8:27b-mlx / ornith:35b-q4_K_M) was
+# still broken, but the actual cause was the broken ~/.ollama/models
+# symlink (external drive unplugged), not the tag names — those specific
+# tags were never individually re-verified against a working daemon.
+# gemma4:e4b-mlx is Parth's preferred local model, pulled locally.
 chains:
   extract_json:
-    - model: gemma4:e4b
+    - model: gemma4:e4b-mlx
       samples: 3
       threshold: 0.7
