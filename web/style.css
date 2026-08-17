@@ -84,6 +84,11 @@ h1 { margin: 0; color: var(--ink); font-size: clamp(2.35rem, 7vw, 3.75rem); lett
 .module-panel { display: none; }
 .module-panel.is-active { display: block; }
 
+.model-select-row { display: flex; align-items: center; gap: 8px; margin: 0 2px 12px; font-size: .82rem; color: var(--muted); }
+.model-select-row select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: .82rem; }
+
+.file-selected-name { margin: 4px 0 0; color: var(--fair); font-size: .82rem; }
+
 .chat-pane {
   /* display is NOT set here — .chat-pane also carries .module-panel, whose
      `display: none` default must win until .is-active is present. Setting

@@ -161,6 +161,22 @@ const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
 const chatLog = document.querySelector("#chat-log");
 const sendButton = chatForm.querySelector('button[type="submit"]');
+const modelSelect = document.querySelector("#model-select");
+
+// Populate the model selector from whatever's actually pulled in Ollama —
+// an empty list (Ollama down, or nothing pulled) just leaves the "Default"
+// option, same graceful degrade as the rest of the app.
+fetch("/api/models")
+  .then((res) => (res.ok ? res.json() : { models: [] }))
+  .then((body) => {
+    for (const name of body.models || []) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      modelSelect.append(option);
+    }
+  })
+  .catch((error) => console.error("FairDeal couldn't load the model list.", error));
 
 chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -183,7 +199,7 @@ chatForm.addEventListener("submit", async (event) => {
     const response = await fetch("/api/rentcheck", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, model: modelSelect.value || null }),
     });
 
     if (!response.ok) {
@@ -224,31 +240,65 @@ document.querySelectorAll(".module-tab").forEach((tab) => {
 
 // -- lease review / contract review (paste-a-document forms) -----------
 
-function wireDocumentReviewForm(formId, logId, endpoint, placeholderText) {
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // reader.result is "data:application/pdf;base64,<data>" — strip the prefix.
+      const commaIndex = reader.result.indexOf(",");
+      resolve(reader.result.slice(commaIndex + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function wireDocumentReviewForm(formId, logId, fileInputId, fileNameId, endpoint, placeholderText) {
   const form = document.querySelector(`#${formId}`);
   const log = document.querySelector(`#${logId}`);
   const textarea = form.querySelector("textarea");
+  const fileInput = document.querySelector(`#${fileInputId}`);
+  const fileNameLabel = document.querySelector(`#${fileNameId}`);
   const button = form.querySelector('button[type="submit"]');
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (file) {
+      fileNameLabel.textContent = `Selected: ${file.name}`;
+      fileNameLabel.hidden = false;
+      textarea.value = "";
+      textarea.disabled = true;
+    } else {
+      fileNameLabel.hidden = true;
+      textarea.disabled = false;
+    }
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const file = fileInput.files[0];
     const text = textarea.value.trim();
-    if (!text) {
+    if (!file && !text) {
       return;
     }
 
-    appendMessage("user", `<em>${placeholderText}</em> (${text.length.toLocaleString()} characters pasted)`, log);
+    const userSummary = file
+      ? `<em>Uploaded ${escapeHtml(file.name)}</em>`
+      : `<em>${placeholderText}</em> (${text.length.toLocaleString()} characters pasted)`;
+    appendMessage("user", userSummary, log);
     textarea.disabled = true;
+    fileInput.disabled = true;
     button.disabled = true;
     appendMessage("app", '<span class="typing-status" role="status">Scanning…</span>', log);
     const typingMessage = log.lastElementChild;
     let responseHtml;
 
     try {
+      const requestBody = file ? { pdf_base64: await readFileAsBase64(file) } : { document_text: text };
       const response = await fetch(`/api/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ document_text: text }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -264,6 +314,7 @@ function wireDocumentReviewForm(formId, logId, endpoint, placeholderText) {
     } finally {
       typingMessage?.remove();
       textarea.disabled = false;
+      fileInput.disabled = false;
       button.disabled = false;
     }
 
@@ -271,8 +322,8 @@ function wireDocumentReviewForm(formId, logId, endpoint, placeholderText) {
   });
 }
 
-wireDocumentReviewForm("lease-review-form", "lease-review-log", "leasereview", "Pasted lease");
-wireDocumentReviewForm("contract-review-form", "contract-review-log", "contractreview", "Pasted contract");
+wireDocumentReviewForm("lease-review-form", "lease-review-log", "lease-file", "lease-file-name", "leasereview", "Pasted lease");
+wireDocumentReviewForm("contract-review-form", "contract-review-log", "contract-file", "contract-file-name", "contractreview", "Pasted contract");
 
 // -- college ROI (school + major form) ----------------------------------
 

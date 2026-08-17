@@ -103,13 +103,17 @@ def _rank_key(result: dict) -> tuple[int, float]:
     return (_RATING_ORDER.get(result["rating"], 3), result["delta"] if result["delta"] is not None else inf)
 
 
-def run(message: str) -> dict:
+def run(message: str, model: str | None = None) -> dict:
     """Answer a rental request with ranked, benchmarked listings.
+
+    `model` overrides the configured cascade with a single Ollama model tag
+    (see fairdeal.cascade.parse_criteria) — passed through from the UI's
+    model selector; omit to use chains.yaml as normal.
 
     Raises CascadeParseError if the message can't be understood; every other
     failure degrades to fewer results rather than an exception.
     """
-    criteria = parse_criteria(message)
+    criteria = parse_criteria(message, model=model)
     provider = get_provider()
     # In-band honesty: the default provider serves a seed/demo dataset, which
     # was previously only visible in the README.

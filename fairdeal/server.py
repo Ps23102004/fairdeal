@@ -6,6 +6,8 @@ matching the sibling llm-ladder / RepoTriage Agent server.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import os
 import sys
@@ -19,6 +21,8 @@ from fairdeal.cascade import CascadeParseError
 from fairdeal.collegeroi import run as collegeroi_run
 from fairdeal.contract import run as contract_run
 from fairdeal.lease import run as lease_run
+from fairdeal.models import ModelListError, list_ollama_models
+from fairdeal.ocr import OCRError, extract_text
 from fairdeal.rentcheck import run as rentcheck_run
 
 DEFAULT_PORT = 8000
@@ -34,23 +38,46 @@ _STATIC_ROUTES = {
 }
 
 # Loopback-only server, so this guards against a misbehaving local client
-# tying up a ThreadingHTTPServer thread, not a remote attacker.
-_MAX_BODY_BYTES = 1_000_000
+# tying up a ThreadingHTTPServer thread, not a remote attacker. Raised from
+# the original 1MB to fit a base64-encoded lease/contract PDF (~1.33x the
+# original file size) — a 10MB PDF upload needs ~13.3MB of JSON body.
+_MAX_BODY_BYTES = 15_000_000
+
+
+def _document_text_from_body(body: dict) -> str:
+    """Either `document_text` (pasted text) or `pdf_base64` (an uploaded PDF,
+    OCR'd via fairdeal.ocr) — whichever the client sent. Raises
+    _BadRequestError for a malformed upload; never both fields, `pdf_base64`
+    takes priority if somehow both are present."""
+    pdf_b64 = body.get("pdf_base64")
+    if isinstance(pdf_b64, str) and pdf_b64.strip():
+        try:
+            pdf_bytes = base64.b64decode(pdf_b64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise _BadRequestError(f"'pdf_base64' is not valid base64: {exc}")
+        try:
+            return extract_text(pdf_bytes)
+        except OCRError as exc:
+            raise _BadRequestError(f"could not read the uploaded PDF: {exc}")
+    return str(body.get("document_text", ""))
+
 
 # Each module's run() takes different arguments (rentcheck: a chat message;
-# lease/contract: pasted document text; collegeroi: school + optional major),
-# so each dict value is a small (body: dict) -> dict adapter, not run() itself
-# — that keeps _route_post's dispatch uniform regardless of a module's own signature.
+# lease/contract: pasted document text or an uploaded PDF; collegeroi: school
+# + optional major), so each dict value is a small (body: dict) -> dict
+# adapter, not run() itself — that keeps _route_post's dispatch uniform
+# regardless of a module's own signature.
 def _dispatch_rentcheck(body: dict) -> dict:
-    return rentcheck_run(str(body.get("message", "")))
+    model = body.get("model")
+    return rentcheck_run(str(body.get("message", "")), model=model if isinstance(model, str) and model.strip() else None)
 
 
 def _dispatch_leasereview(body: dict) -> dict:
-    return lease_run(str(body.get("document_text", "")))
+    return lease_run(_document_text_from_body(body))
 
 
 def _dispatch_contractreview(body: dict) -> dict:
-    return contract_run(str(body.get("document_text", "")))
+    return contract_run(_document_text_from_body(body))
 
 
 def _dispatch_collegeroi(body: dict) -> dict:
@@ -163,6 +190,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def _route_get(self) -> None:
         path = urlsplit(self.path).path
+        if path == "/api/models":
+            try:
+                self._send_json(HTTPStatus.OK, {"models": list_ollama_models()})
+            except ModelListError:
+                # Ollama unreachable is a normal, expected state here (same
+                # degrade the rentcheck chat already handles) — the selector
+                # UI just shows no options, not an error toast.
+                self._send_json(HTTPStatus.OK, {"models": []})
+            return
         if path.startswith("/api/"):
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
             return

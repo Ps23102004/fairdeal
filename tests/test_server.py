@@ -48,6 +48,17 @@ def _post(port: int, path: str, body: bytes | None, headers: dict | None = None)
         conn.close()
 
 
+def _get(port: int, path: str) -> tuple[int, dict]:
+    conn = HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        conn.request("GET", path)
+        resp = conn.getresponse()
+        raw = resp.read()
+        return resp.status, (json.loads(raw) if raw else {})
+    finally:
+        conn.close()
+
+
 def test_forbidden_host_rejected(live_server) -> None:
     status, payload = _post(live_server, "/api/rentcheck", b'{"message":"hi"}', {"Host": "evil.test"})
     assert status == 403
@@ -193,6 +204,107 @@ def test_unexpected_exception_returns_generic_500_no_leak(live_server) -> None:
     assert status == 500
     assert payload == {"error": "internal server error"}
     assert "internal detail" not in json.dumps(payload)
+
+
+def test_models_endpoint_returns_pulled_models(live_server) -> None:
+    with patch("fairdeal.server.list_ollama_models", return_value=["qwen2.5:3b", "llama3.2:3b"]):
+        status, payload = _get(live_server, "/api/models")
+    assert status == 200
+    assert payload == {"models": ["qwen2.5:3b", "llama3.2:3b"]}
+
+
+def test_models_endpoint_degrades_to_empty_list_when_ollama_unreachable(live_server) -> None:
+    from fairdeal.models import ModelListError
+
+    with patch("fairdeal.server.list_ollama_models", side_effect=ModelListError("connection refused")):
+        status, payload = _get(live_server, "/api/models")
+    assert status == 200
+    assert payload == {"models": []}
+
+
+def test_rentcheck_dispatch_passes_model_override(live_server) -> None:
+    captured = {}
+
+    def fake_run(message, model=None):
+        captured["model"] = model
+        return {"reply_text": "ok", "results": [], "data_source": "seed-demo", "web_references": []}
+
+    with patch("fairdeal.server.rentcheck_run", fake_run):
+        status, payload = _post(
+            live_server,
+            "/api/rentcheck",
+            json.dumps({"message": "hi", "model": "llama3.2:3b"}).encode(),
+            {"Content-Type": "application/json"},
+        )
+    assert status == 200
+    assert captured["model"] == "llama3.2:3b"
+
+
+def test_rentcheck_dispatch_blank_model_becomes_none(live_server) -> None:
+    captured = {}
+
+    def fake_run(message, model=None):
+        captured["model"] = model
+        return {"reply_text": "ok", "results": [], "data_source": "seed-demo", "web_references": []}
+
+    with patch("fairdeal.server.rentcheck_run", fake_run):
+        _post(
+            live_server,
+            "/api/rentcheck",
+            json.dumps({"message": "hi", "model": "  "}).encode(),
+            {"Content-Type": "application/json"},
+        )
+    assert captured["model"] is None
+
+
+def test_leasereview_accepts_pdf_base64_upload(live_server) -> None:
+    import base64
+
+    captured = {}
+
+    def fake_run(document_text):
+        captured["document_text"] = document_text
+        return {"reply_text": "ok", "data_source": "clause-library-v1", "results": []}
+
+    with (
+        patch("fairdeal.server.lease_run", fake_run),
+        patch("fairdeal.server.extract_text", return_value="extracted lease text"),
+    ):
+        status, payload = _post(
+            live_server,
+            "/api/leasereview",
+            json.dumps({"pdf_base64": base64.b64encode(b"fake pdf bytes").decode()}).encode(),
+            {"Content-Type": "application/json"},
+        )
+    assert status == 200
+    assert captured["document_text"] == "extracted lease text"
+
+
+def test_leasereview_malformed_base64_returns_400(live_server) -> None:
+    status, payload = _post(
+        live_server,
+        "/api/leasereview",
+        json.dumps({"pdf_base64": "not valid base64!!!"}).encode(),
+        {"Content-Type": "application/json"},
+    )
+    assert status == 400
+    assert "base64" in payload["error"]
+
+
+def test_leasereview_unreadable_pdf_returns_400(live_server) -> None:
+    import base64
+
+    from fairdeal.ocr import OCRError
+
+    with patch("fairdeal.server.extract_text", side_effect=OCRError("could not read PDF: corrupt")):
+        status, payload = _post(
+            live_server,
+            "/api/leasereview",
+            json.dumps({"pdf_base64": base64.b64encode(b"not a pdf").decode()}).encode(),
+            {"Content-Type": "application/json"},
+        )
+    assert status == 400
+    assert "uploaded PDF" in payload["error"]
 
 
 def test_static_index_served(live_server) -> None:

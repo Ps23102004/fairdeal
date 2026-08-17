@@ -22,6 +22,13 @@
         <a class="module-tab" href="#contract-review" data-target="contract-review">Contract Review</a>
       </nav>
 
+      <div class="model-select-row">
+        <label for="model-select">Local model (Rent Check only)</label>
+        <select id="model-select">
+          <option value="">Default (chains.yaml)</option>
+        </select>
+      </div>
+
       <section class="chat-pane module-panel is-active" id="rent-check" data-target="rent-check" aria-label="Rent check chat">
         <div class="chat-log" id="chat-log" aria-live="polite" aria-label="Conversation">
           <article class="message message--app">
@@ -46,8 +53,13 @@
         </div>
 
         <form class="document-review-form" id="lease-review-form">
+          <div class="form-field">
+            <label for="lease-file">Upload a PDF <span>(optional — or paste text below)</span></label>
+            <input id="lease-file" name="lease_file" type="file" accept="application/pdf">
+            <p class="file-selected-name" id="lease-file-name" hidden></p>
+          </div>
           <label for="lease-text">Paste your lease text</label>
-          <textarea id="lease-text" name="lease_text" rows="10" placeholder="Paste the full lease, or the clauses you want to understand—fees, deposits, repairs, renewal terms, and more." required></textarea>
+          <textarea id="lease-text" name="lease_text" rows="10" placeholder="Paste the full lease, or the clauses you want to understand—fees, deposits, repairs, renewal terms, and more."></textarea>
           <button type="submit">Check This Lease <span aria-hidden="true">→</span></button>
         </form>
       </section>
@@ -80,8 +92,13 @@
         </div>
 
         <form class="document-review-form" id="contract-review-form">
+          <div class="form-field">
+            <label for="contract-file">Upload a PDF <span>(optional — or paste text below)</span></label>
+            <input id="contract-file" name="contract_file" type="file" accept="application/pdf">
+            <p class="file-selected-name" id="contract-file-name" hidden></p>
+          </div>
           <label for="contract-text">Paste your contract text</label>
-          <textarea id="contract-text" name="contract_text" rows="10" placeholder="Paste the full contract, or the clauses you want to review—payment, cancellation, liability, and renewal terms." required></textarea>
+          <textarea id="contract-text" name="contract_text" rows="10" placeholder="Paste the full contract, or the clauses you want to review—payment, cancellation, liability, and renewal terms."></textarea>
           <button type="submit">Check This Contract <span aria-hidden="true">→</span></button>
         </form>
       </section>

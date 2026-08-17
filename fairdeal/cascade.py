@@ -10,7 +10,7 @@ import json
 import re
 from pathlib import Path
 
-from llm_ladder.config import load_chains
+from llm_ladder.config import ChainConfig, TierConfig, load_chains
 from llm_ladder.engine import run_cascade
 from llm_ladder.ollama_client import OllamaConnectionError, OllamaModelNotFoundError
 
@@ -94,13 +94,21 @@ def _validate(data: dict) -> SearchCriteria:
     )
 
 
-def parse_criteria(message: str) -> SearchCriteria:
+def parse_criteria(message: str, model: str | None = None) -> SearchCriteria:
     """Turn a free-text rental request into SearchCriteria using the local model cascade.
+
+    `model`, when given, overrides chains.yaml entirely with a single-tier,
+    single-sample chain for that exact model — lets a caller (the model
+    selector in the UI) pick any Ollama-pulled model for one request without
+    editing config. Omit to use the configured cascade as normal.
 
     Raises CascadeParseError if no local model is reachable or the response
     can't be parsed into the expected shape.
     """
-    chain_config = load_chains(str(CHAINS_PATH))[CHAIN_NAME]
+    if model:
+        chain_config = ChainConfig(name="user-selected", tiers=[TierConfig(model=model, samples=1, threshold=0.0)])
+    else:
+        chain_config = load_chains(str(CHAINS_PATH))[CHAIN_NAME]
     try:
         result = run_cascade(_PROMPT.format(message=message), CHAIN_NAME, chain_config, ledger=None)
     except (OllamaConnectionError, OllamaModelNotFoundError) as exc:
