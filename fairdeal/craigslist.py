@@ -116,10 +116,10 @@ class SeedProvider:
     PROVIDER_NAME = "seed-demo"  # surfaced as the API's "data_source" field
 
     def search(self, criteria: SearchCriteria) -> list[Listing]:
-        cap = criteria.budget_monthly * 1.10
+        cap = criteria.budget_monthly * 1.10 if criteria.budget_monthly is not None else None
         results: list[Listing] = []
         for listing in _SEED_LISTINGS:
-            if listing.price > cap:
+            if cap is not None and listing.price > cap:
                 continue
             if criteria.bedrooms is not None and listing.bedrooms != criteria.bedrooms:
                 continue

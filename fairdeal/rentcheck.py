@@ -135,11 +135,12 @@ def run(message: str) -> dict:
 
     results.sort(key=_rank_key)
     fair = sum(1 for r in results if r["rating"] == "fair")
+    budget_clause = f" under ${criteria.budget_monthly:,}/month" if criteria.budget_monthly is not None else ""
     reply_text = (
         f"Found {len(results)} place{'' if len(results) == 1 else 's'} near your criteria, "
         f"{fair} look{'s' if fair == 1 else ''} fairly priced."
         if results
-        else f"Found nothing within {DEFAULT_RADIUS_MILES:g} miles of those places under ${criteria.budget_monthly:,}/month."
+        else f"Found nothing within {DEFAULT_RADIUS_MILES:g} miles of those places{budget_clause}."
     )
     return {"reply_text": reply_text, "results": results, "data_source": data_source}
 

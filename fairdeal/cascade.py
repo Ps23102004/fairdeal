@@ -23,11 +23,13 @@ _PROMPT = """You extract structured search criteria from a renter's request.
 Respond with STRICT JSON ONLY — no prose, no markdown fences, no explanation.
 
 Schema (exactly these four keys):
-{{"anchors": ["..."], "budget_monthly": <int>, "bedrooms": <int or null>, "home_type": "<string or null>"}}
+{{"anchors": ["..."], "budget_monthly": <int or null>, "bedrooms": <int or null>, "home_type": "<string or null>"}}
 
 anchors: place names mentioned — universities, neighborhoods, landmarks, cities.
   Expand well-known abbreviations to their full name.
-budget_monthly: the dollar figure mentioned, digits only (no $ or commas).
+budget_monthly: a dollar figure EXPLICITLY stated as rent/budget/price, digits only (no $ or commas).
+  null if no dollar amount is stated. NEVER infer a budget from an unrelated number in the
+  message (a headcount like "5 guys", a bedroom count, a distance, a date — none of these are a budget).
 bedrooms: number of bedrooms, or null if unstated.
 home_type: e.g. "apartment", "house", "studio", or null if unstated.
 
@@ -36,6 +38,9 @@ Example output: {{"anchors": ["University of San Francisco", "beach"], "budget_m
 
 Example input: looking for a house in Oakland under $3,200
 Example output: {{"anchors": ["Oakland"], "budget_monthly": 3200, "bedrooms": null, "home_type": "house"}}
+
+Example input: house to rent for 5 guys in Miami near the beach
+Example output: {{"anchors": ["Miami", "beach"], "budget_monthly": null, "bedrooms": null, "home_type": "house"}}
 
 Input: {message}
 Output:"""
@@ -70,8 +75,8 @@ def _validate(data: dict) -> SearchCriteria:
         raise CascadeParseError(f"'anchors' must be a list of strings, got {anchors!r}")
 
     budget = data.get("budget_monthly")
-    if isinstance(budget, bool) or not isinstance(budget, (int, float)):
-        raise CascadeParseError(f"'budget_monthly' must be a number, got {budget!r}")
+    if budget is not None and (isinstance(budget, bool) or not isinstance(budget, (int, float))):
+        raise CascadeParseError(f"'budget_monthly' must be a number or null, got {budget!r}")
 
     bedrooms = data.get("bedrooms")
     if bedrooms is not None and (isinstance(bedrooms, bool) or not isinstance(bedrooms, int)):
@@ -83,7 +88,7 @@ def _validate(data: dict) -> SearchCriteria:
 
     return SearchCriteria(
         anchors=anchors,
-        budget_monthly=int(budget),
+        budget_monthly=int(budget) if budget is not None else None,
         bedrooms=bedrooms,
         home_type=home_type,
     )

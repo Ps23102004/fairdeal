@@ -51,6 +51,19 @@ def test_parse_criteria_wrong_shape_raises() -> None:
             parse_criteria("anything")
 
 
+def test_parse_criteria_no_budget_stated_stays_none() -> None:
+    # Regression: budget_monthly used to be non-nullable in the schema, which
+    # forced the model to hallucinate a number when none was mentioned (e.g.
+    # misreading "5 guys" as a $5,000 budget). It must stay None when the
+    # model correctly reports no budget was stated.
+    answer = '{"anchors": ["Miami", "beach"], "budget_monthly": null, "bedrooms": null, "home_type": "house"}'
+    with patch("fairdeal.cascade.run_cascade", return_value=_cascade_result(answer)):
+        criteria = parse_criteria("house to rent for 5 guys in Miami near the beach")
+
+    assert criteria.budget_monthly is None
+    assert criteria.anchors == ["Miami", "beach"]
+
+
 def test_parse_criteria_no_local_model_raises_cascade_parse_error() -> None:
     with patch("fairdeal.cascade.run_cascade", side_effect=OllamaConnectionError("connection refused")):
         with pytest.raises(CascadeParseError, match="local model inference is unavailable"):

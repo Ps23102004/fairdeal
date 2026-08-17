@@ -4,7 +4,7 @@ from fairdeal.craigslist import SeedProvider
 from fairdeal.search import SearchCriteria
 
 
-def _criteria(budget: int = 2400, bedrooms: int | None = None, home_type: str | None = None) -> SearchCriteria:
+def _criteria(budget: int | None = 2400, bedrooms: int | None = None, home_type: str | None = None) -> SearchCriteria:
     # bedrooms/home_type default to None = "not specified", which filters nothing.
     return SearchCriteria(
         anchors=["San Francisco", "Oakland"],
@@ -78,3 +78,10 @@ def test_search_returns_listing_objects_with_expected_shape() -> None:
 
 def test_provider_identifies_itself_as_seed_demo() -> None:
     assert SeedProvider.PROVIDER_NAME == "seed-demo"
+
+
+def test_search_unspecified_budget_filters_nothing() -> None:
+    # budget_monthly=None means "not stated" — must not filter, and must not
+    # crash on `None * 1.10`.
+    results = SeedProvider().search(_criteria(budget=None))
+    assert len(results) == 8  # every seed listing survives

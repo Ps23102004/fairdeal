@@ -21,7 +21,7 @@ class Listing:
 @dataclass
 class SearchCriteria:
     anchors: list[str]  # neighborhoods/cities/universities the user cares about
-    budget_monthly: int  # USD
+    budget_monthly: int | None  # USD; None = not stated, don't filter on it
     bedrooms: int | None
     home_type: str | None
 

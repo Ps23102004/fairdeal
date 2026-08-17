@@ -66,6 +66,31 @@ def test_run_no_anchors_geocode_returns_empty_without_crashing() -> None:
     assert "couldn't locate" in result["reply_text"]
 
 
+def test_run_no_results_reply_text_omits_budget_when_none() -> None:
+    with (
+        patch("fairdeal.rentcheck.parse_criteria", return_value=_criteria(budget=None)),
+        patch("fairdeal.rentcheck.geocode", return_value=_usf_point()),
+        patch("fairdeal.rentcheck.get_provider") as mock_get_provider,
+    ):
+        mock_get_provider.return_value.search.return_value = []
+        result = run("something near USF")
+
+    assert "under $" not in result["reply_text"]
+    assert "those places." in result["reply_text"]
+
+
+def test_run_no_results_reply_text_includes_budget_when_stated() -> None:
+    with (
+        patch("fairdeal.rentcheck.parse_criteria", return_value=_criteria(budget=2500)),
+        patch("fairdeal.rentcheck.geocode", return_value=_usf_point()),
+        patch("fairdeal.rentcheck.get_provider") as mock_get_provider,
+    ):
+        mock_get_provider.return_value.search.return_value = []
+        result = run("something near USF under $2500")
+
+    assert "under $2,500/month." in result["reply_text"]
+
+
 def test_run_excludes_listings_beyond_radius() -> None:
     far_listing = _listing(price=2400, lat=38.5, lon=-121.5)  # well outside DEFAULT_RADIUS_MILES
     with (
