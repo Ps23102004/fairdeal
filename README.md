@@ -17,7 +17,7 @@ One core engine (`fairdeal/engine.py`): extract a claim → compare it to a benc
 
 Lease/contract review are deliberately independent of the local-LLM cascade — deterministic keyword matching against the clause library, so they keep working even when Ollama is down (unlike rent-check's chat parsing). Both accept a pasted-text OR an uploaded PDF (`fairdeal/ocr.py`: pypdf text layer + tesseract fallback for scanned pages). Rent Check has a model selector in the UI — pick any Ollama-pulled model for that one request via `GET /api/models` / the `model` field on `POST /api/rentcheck`, bypassing `chains.yaml`'s configured cascade.
 
-Local-first: extraction runs through [llm-ladder](https://github.com/Ps23102004/llm-ladder)'s confidence-gated cascade (local models first, escalate only on low confidence). Nothing leaves the machine unless a paid API tier is configured in `chains.yaml`.
+Local-first: extraction runs through [llm-ladder](https://github.com/Ps23102004/llm-ladder)'s cascade (local models first, escalate only on low confidence). Nothing leaves the machine unless a paid API tier is configured in `chains.yaml`.
 
 ## Data sources: what was verified live
 
