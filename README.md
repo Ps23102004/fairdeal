@@ -1,5 +1,7 @@
 # FairDeal
 
+[![tests](https://github.com/Ps23102004/fairdeal/actions/workflows/tests.yml/badge.svg)](https://github.com/Ps23102004/fairdeal/actions/workflows/tests.yml)
+
 Point FairDeal at a rent listing, lease, college/major choice, or freelance contract — get an honest "is this fair, and why" verdict against real benchmark data.
 
 One core engine (`fairdeal/engine.py`): extract a claim → compare it to a benchmark → output a verdict. Four pluggable modules share it:
@@ -17,12 +19,12 @@ Lease/contract review are deliberately independent of the local-LLM cascade — 
 
 Local-first: extraction runs through [llm-ladder](https://github.com/Ps23102004/llm-ladder)'s confidence-gated cascade (local models first, escalate only on low confidence). Nothing leaves the machine unless a paid API tier is configured in `chains.yaml`.
 
-## Endpoint verification log (day 1)
+## Data sources: what was verified live
 
 Recorded here as each external data source is confirmed live — see `tests/fixtures/` for saved responses.
 
 - **Craigslist RSS / HTML search** — DEAD. Both `?format=rss` and the plain HTML search page return HTTP 403 "blocked" (bot-detection). Confirmed 2026-08-16. No working zero-key path to individual rental listings was found (Zillow and Apartments.com also 403 direct-fetch; DuckDuckGo HTML search works but only surfaces category/landing pages, not individual listings). **Default search provider ships as a labeled seed/demo dataset** (`fairdeal/craigslist.py`) instead. To get real listings, register a paid provider (e.g. RentCast) and add it behind `fairdeal/search.py`'s `SearchProvider` interface.
-- **HUD Fair Market Rent API** — live, requires a free bearer token. Unauthenticated request confirmed `401 {"error":"Unauthenticated"}` (fixture: `tests/fixtures/hud_fmr_unauth_response.json`). **Action needed from Parth**: register at https://www.huduser.gov/hudapi/public/register.html and set `HUD_API_TOKEN`. Until then, `fairdeal/hud.py` falls back to a small static FMR reference table.
+- **HUD Fair Market Rent API** — live, requires a free bearer token. Unauthenticated request confirmed `401 {"error":"Unauthenticated"}` (fixture: `tests/fixtures/hud_fmr_unauth_response.json`). To use it, register at https://www.huduser.gov/hudapi/public/register.html and set `HUD_API_TOKEN`; without a token, `fairdeal/hud.py` falls back to a small static FMR reference table.
 - **BLS CPI v2** — live, works with no key at low volume. Confirmed 2026-08-16 (fixture: `tests/fixtures/bls_cpi_sf.json`).
 - **Nominatim geocoding/reverse-geocoding** — live, no key, rate-limited to 1 req/sec (throttled in `fairdeal/geocode.py`). Confirmed for both search and reverse (fixtures: `tests/fixtures/nominatim_search_usf.json`, `tests/fixtures/nominatim_reverse_sf.json`).
 - **DuckDuckGo HTML search** (rent-check's `web_references`) — live, no key. Requires POST (a GET just returns the empty search shell) and a browser-like User-Agent. Ad results always redirect through `duckduckgo.com/y.js` — filtered out in `fairdeal/websearch.py`, only organic direct-domain links are kept.
